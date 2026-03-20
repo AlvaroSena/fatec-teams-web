@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,17 +19,25 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { LoaderCircleIcon, ShieldUserIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod/v3";
 import { signInAction } from "./actions";
 
 const signInFormSchema = z.object({
   email: z.string().email({ message: "Digite um e-mail institucional válido" }),
-  password: z.string().min(8, { message: "Digite uma senha válida" }),
+  password: z.string().min(6, { message: "Digite uma senha válida" }),
 });
 
 type SignInFormSchema = z.infer<typeof signInFormSchema>;
+
+type SignInResponse = {
+  success: boolean;
+  message: string;
+  isError: boolean;
+};
 
 export function SignInForm({
   className,
@@ -42,17 +51,37 @@ export function SignInForm({
     resolver: zodResolver(signInFormSchema),
   });
 
-  const { mutateAsync } = useMutation({
+  const router = useRouter();
+
+  const { isPending, mutateAsync, data } = useMutation<
+    SignInResponse,
+    Error,
+    SignInFormSchema
+  >({
     mutationKey: ["sign-in"],
     mutationFn: signInAction,
   });
 
-  async function handleSubmitForm(data: SignInFormSchema) {
-    await mutateAsync(data);
+  async function handleSubmitForm({ email, password }: SignInFormSchema) {
+    const { success } = await mutateAsync({
+      email,
+      password,
+    });
+
+    if (success) {
+      router.push("/");
+    }
   }
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
+      {data?.isError && (
+        <Alert variant="destructive">
+          <ShieldUserIcon />
+          <AlertTitle>Erro ao acessar a conta</AlertTitle>
+          <AlertDescription>{data.message}</AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Acesse sua conta</CardTitle>
@@ -100,7 +129,9 @@ export function SignInForm({
                 )}
               </Field>
               <Field>
-                <Button type="submit">Entrar na conta</Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? <LoaderCircleIcon /> : "Entrar na conta"}
+                </Button>
                 <FieldDescription className="text-center">
                   Don&apos;Não tem uma conta?{" "}
                   <Link href="/sign-up">Cadastre-se</Link>
